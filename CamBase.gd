@@ -3,17 +3,23 @@ extends Spatial
 const MOVE_MARGIN = 20
 const MOVE_SPEED = 30
 
+const ZOOM_MIN:float = 15.0
+const ZOOM_MAX:float = 60.0
+var zoom_speed:float = 30.0
+
 const ray_length = 1000
 onready var cam = $Camera
 
 var team = 0
-var selected_units = []
+var selected_units:Array = []
 onready var selection_box = $SelectionBox
 var start_sel_pos = Vector2()
 
 func _process(delta):
 	var m_pos = get_viewport().get_mouse_position()
 	calc_move(m_pos, delta)
+	calc_zoom(delta)
+	
 	if Input.is_action_just_pressed("main_command"):
 		move_selected_units(m_pos)
 	if Input.is_action_just_pressed("alt_command"):
@@ -38,8 +44,28 @@ func calc_move(m_pos, delta):
 		move_vec.x += 1
 	if m_pos.y > v_size.y - MOVE_MARGIN:
 		move_vec.z += 1
+	
+	if Input.is_action_pressed("ui_left"):
+		move_vec.x -= 1
+	if Input.is_action_pressed("ui_right"):
+		move_vec.x += 1
+	if Input.is_action_pressed("ui_up"):
+		move_vec.z -= 1
+	if Input.is_action_pressed("ui_down"):
+		move_vec.z += 1
+	
 	move_vec = move_vec.rotated(Vector3(0, 1, 0), rotation_degrees.y)
 	global_translate(move_vec * delta * MOVE_SPEED)
+
+# TODO: Fix mouse wheel not working
+func calc_zoom(delta) -> void:
+	var zoom_input = 0.0
+	if Input.is_action_pressed("zoom_in"):
+		zoom_input = -1
+	if Input.is_action_pressed("zoom_out"):
+		zoom_input += 1
+	
+	cam.translation.z = clamp(cam.translation.z + zoom_input * zoom_speed * delta, ZOOM_MIN, ZOOM_MAX)
 
 func move_selected_units(m_pos):
 	var result = raycast_from_mouse(m_pos, 1)
@@ -56,11 +82,17 @@ func select_units(m_pos):
 	else:
 		new_selected_units = get_units_in_box(start_sel_pos, m_pos)
 	if new_selected_units.size() != 0:
-		for unit in selected_units:
-			unit.deselect()
-		for unit in new_selected_units:
-			unit.select()
-		selected_units = new_selected_units
+		if Input.is_action_pressed("selection_shift"):
+			for unit in new_selected_units:
+				if not selected_units.has(unit):
+					unit.select()
+					selected_units.append(unit)
+		else:
+			for unit in selected_units:
+				unit.deselect()
+			for unit in new_selected_units:
+				unit.select()
+			selected_units = new_selected_units
 
 func get_unit_under_mouse(m_pos):
 	var result = raycast_from_mouse(m_pos, 3)
