@@ -4,8 +4,14 @@ const MOVE_MARGIN = 20
 const MOVE_SPEED = 30
 
 const ZOOM_MIN:float = 15.0
-const ZOOM_MAX:float = 60.0
-var zoom_speed:float = 30.0
+const ZOOM_MAX:float = 85.0
+const ANGLE_FAR:float = -70.0
+const ANGLE_NEAR:float = -50.0
+var zoom_speed:float = 14.0
+var scroll_strength:float = 7.0
+var zoom_input_strength:float = 23.0
+var scroll_input:float = 0.0
+var zoom_target:float = 55.0
 
 const ray_length = 1000
 onready var cam = $Camera
@@ -57,15 +63,26 @@ func calc_move(m_pos, delta):
 	move_vec = move_vec.rotated(Vector3(0, 1, 0), rotation_degrees.y)
 	global_translate(move_vec * delta * MOVE_SPEED)
 
-# TODO: Fix mouse wheel not working
+func _input(event:InputEvent) -> void:
+	if event.is_action_pressed("zoom_in_mouse"):
+		scroll_input = -event.get_action_strength("zoom_in_mouse") * scroll_strength
+	elif event.is_action_pressed("zoom_out_mouse"):
+		scroll_input = event.get_action_strength("zoom_out_mouse") * scroll_strength
+
 func calc_zoom(delta) -> void:
-	var zoom_input = 0.0
+	# Zoom
 	if Input.is_action_pressed("zoom_in"):
-		zoom_input = -1
+		scroll_input -= 1.0
 	if Input.is_action_pressed("zoom_out"):
-		zoom_input += 1
+		scroll_input += 1.0
+	zoom_target += scroll_input * zoom_input_strength * delta
+	zoom_target = clamp(zoom_target, ZOOM_MIN, ZOOM_MAX)
 	
-	cam.translation.z = clamp(cam.translation.z + zoom_input * zoom_speed * delta, ZOOM_MIN, ZOOM_MAX)
+	cam.translation.z = lerp(cam.translation.z, zoom_target, min(1.0, zoom_speed * delta))
+	
+	scroll_input = lerp(scroll_input, 0, min(1.0, 15.0 * delta))
+	
+	rotation_degrees.x = lerp(ANGLE_NEAR, ANGLE_FAR, (cam.translation.z-ZOOM_MIN)/(ZOOM_MAX-ZOOM_MIN))
 
 func move_selected_units(m_pos):
 	var result = raycast_from_mouse(m_pos, 1)
